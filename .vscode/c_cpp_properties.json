@@ -1,0 +1,16 @@
+{
+    "configurations": [
+      {
+        "name": "Win32",
+        "includePath": [
+          "${workspaceFolder}/include/**"  // 包含 SDL2 頭文件
+        ],
+        "defines": [],
+        "compilerPath": "C:/MinGW/bin/g++.exe",  // 根據你的 MinGW 路徑修改
+        "cStandard": "c17",
+        "cppStandard": "c++17",
+        "intelliSenseMode": "windows-gcc-x86"
+      }
+    ],
+    "version": 4
+  }
