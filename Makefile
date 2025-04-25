@@ -1,7 +1,7 @@
 # 編譯器設定
 CC = g++
 CFLAGS = -g -I"./include" -L"./lib"
-LDFLAGS = -lmingw32 -lSDL2main -lSDL2 -mwindows
+LDFLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lSDL2_image -mwindows
 TARGET = main.exe
 
 # 源文件設定
