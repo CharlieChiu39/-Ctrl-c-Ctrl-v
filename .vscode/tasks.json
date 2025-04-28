@@ -1,27 +1,39 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Build with SDL2",
-      "type": "shell",
-      "command": "g++",
-      "args": [
-        "-g",
-        "-I\"${workspaceFolder}/include\"",  // 用引號包裹
-        "-L\"${workspaceFolder}/lib\"",      // 用引號包裹
-        "\"${workspaceFolder}/src/main.c\"", // 用引號包裹
-        "-o",
-        "\"${workspaceFolder}/main.exe\"",   // 用引號包裹
-        "-lmingw32",
-        "-lSDL2main",
-        "-lSDL2",
-        "-mwindows"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": "$gcc"
-    }
-  ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build SDL Game with Mixer and Image",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g",
+                "main.cpp",
+                "-Iinclude",
+                "-Llib",
+                "-Llib_mixer",
+                "-Llib_image",
+                "-lmingw32",
+                "-lSDL2main",
+                "-lSDL2",
+                "-lSDL2_mixer",
+                "-lSDL2_image",
+                "-lgdi32",
+                "-luser32",
+                "-lwinmm",
+                "-limm32",
+                "-lole32",
+                "-loleaut32",
+                "-lsetupapi",
+                "-lversion",
+                "-o",
+                "game.exe"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "編譯 SDL 遊戲（包含 SDL2、SDL_mixer 和 SDL_image）"
+        }
+    ]
 }

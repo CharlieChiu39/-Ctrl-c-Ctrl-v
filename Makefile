@@ -1,27 +1,55 @@
-# 編譯器設定
-CC = g++
-CFLAGS = -g -I"./include" -L"./lib"
-LDFLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_mixer -lSDL2_image -mwindows
-TARGET = main.exe
+#Compiler
+CXX = g++
 
-# 源文件設定
-SRC_DIR = src
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(SRCS:.c=.o)
+#Compiler flags (e.g., include paths, warnings)
+#We put -I"include" here
+CXXFLAGS = -I"include" -Wall -Wextra # Added -Wall -Wextra for more warnings, good practice!
 
-# 默認目標
-all: $(TARGET)
+#Linker flags (e.g., library paths)
+#We put -L paths here
+LDFLAGS = -L"lib" -L"lib_image" -L"lib_mixer"
 
-# 主目標鏈接
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+#Libraries to link
+#We put -l libraries here
+LDLIBS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer
 
-# 通用編譯規則
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+#Source files
+#List all your .cpp files here
+SOURCES = src/main.cpp \
+          src/Game.cpp \
+          src/Player.cpp \
+          src/AnimationData.cpp \
+          src/TextureManager.cpp \
+          src/AudioManager.cpp
 
-# 清理
+#Object files: Automatically generate .o filenames from .cpp filenames
+OBJECTS = $(SOURCES:.cpp=.o)
+
+#Executable name
+EXECUTABLE = game.exe
+
+#--- Targets ---
+#Default target: Build the executable
+#The first target in the file is the default one executed when you just type 'make'
+all: $(EXECUTABLE)
+
+#Rule to link the executable
+#Depends on all object files
+$(EXECUTABLE): $(OBJECTS)
+	@echo Linking $@... # Print a message
+	$(CXX) $(LDFLAGS) $^ -o $@ $(LDLIBS)
+	@echo Build finished: $@
+
+#Pattern rule to compile .cpp files into .o files
+#Creates a .o file from a .cpp file with the same name
+%.o: %.cpp
+	@echo Compiling $<... # Print a message
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+#Target to clean up generated files
 clean:
-	del /Q $(subst /,\,$(OBJS)) $(TARGET) 2>nul
+	@echo Cleaning up... # Print a message
+	rm -f $(OBJECTS) $(EXECUTABLE) # Use rm -f to force remove and ignore errors if files don't exist
 
+#Declare targets that are not actual files
 .PHONY: all clean
