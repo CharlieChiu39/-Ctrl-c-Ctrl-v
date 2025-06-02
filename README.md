@@ -109,15 +109,27 @@
 
 ## 專案結構 (`src` 資料夾內)
 src/
+
 ├── main.cpp                  # 程式主入口點，初始化並運行遊戲
-├── Game.h/.cpp               # 遊戲核心邏輯，狀態管理，事件處理，渲染迴圈
+
+├── Game.h/.cpp # 遊戲核心邏輯，狀態管理，事件處理，渲染迴圈
+
 ├── Player.h/.cpp             # 玩家角色類別，處理玩家動作、狀態、碰撞、動畫
+
 ├── AnimationData.h/.cpp      # 管理角色動畫幀數據與定義
+
 ├── TextureManager.h/.cpp     # 靜態類別，用於載入、管理和釋放遊戲紋理
+
 ├── AudioManager.h/.cpp       # 靜態類別，用於載入、管理和播放背景音樂與音效
+
 ├── Constants.h               # 定義遊戲中使用的全域常數 (如螢幕尺寸、物理參數、遊戲規則等)
+
 ├── record.txt                # 文字檔案，用於儲存最近的遊戲記錄
+
 └── assets/                   # (推測，根據程式碼中的路徑引用) 存放所有遊戲資源
+
 ├── fonts/                # 字型檔案 (例如 msjh.ttf)
+
 ├── images/               # 圖片檔案 (例如 asiagodton.png, godon.png, start_picture.jpg, image.png 等)
+
 └── sounds/               # 音效檔案 (例如 bgm.wav, hurt0.wav, fire0.wav, lose0.wav, victory0.wav 等)
