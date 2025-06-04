@@ -10,12 +10,16 @@ const int GROUND_LEVEL = SCREEN_HEIGHT - 80;
 
 // --- 物理常數 ---
 const float MOVE_SPEED = 300.0f;
-const float JUMP_STRENGTH = 800.0f;
-const float GRAVITY = 2500.0f;
+const float JUMP_STRENGTH = 800.0f;   // 進一步降低跳躍力量
+const float GRAVITY = 2000.0f;        // 相應調整重力
 
 // --- 遊戲規則/數值 ---
 const int ATTACK_DAMAGE = 15;
 const float PLAYER_DEFAULT_HEALTH = 100.0f;
+const float ROUND_TIME_LIMIT = 99.0f; // 回合時間限制 (秒)
+const float ROUND_DURATION = ROUND_TIME_LIMIT; // 回合持續時間
+const int   ROUNDS_TO_WIN_MATCH = 2;     // 贏得比賽所需的回合勝利數
+const float ROUND_OVER_DELAY = 3.0f;       // 回合結束後顯示結果的延遲時間 (秒)
 
 // --- 時間相關 ---
 const float ATTACK_DURATION = 0.3f;
@@ -31,7 +35,8 @@ const float ATTACK_RATE_COOLDOWN = 1.0f; // 攻擊速率冷卻時間 (1秒)
 // --- 氣功 (Projectile) 常數 ---
 const float PROJECTILE_SPEED = 600.0f;           // 氣功飛行速度 (像素/秒)
 const int   PROJECTILE_DAMAGE = 25;              // 氣功傷害值
-const float PROJECTILE_COOLDOWN = 1.5f;          // 氣功發射冷卻時間 (秒)
+const float PROJECTILE_COOLDOWN = 5.0f;          // 氣功發射冷卻時間 (秒)
+const float SPECIAL_ATTACK_COOLDOWN = 10.0f;     // 特殊技能冷卻時間 (秒)
 
 // 精靈圖相關 (非常重要，請務必修改!)
 const int   PROJECTILE_SRC_X = 630;                // <--- 氣功在精靈圖上的 X 起始座標
@@ -45,9 +50,16 @@ const int   PROJECTILE_HITBOX_W = 64;            // <--- 氣功在遊戲中的�
 const int   PROJECTILE_HITBOX_H = 45;            // <--- 氣功在遊戲中的碰撞高度 (可以跟 SRC_H 一樣)
 
 // --- 玩家邏輯/碰撞尺寸 (每個角色可能不同，可移至角色配置檔) ---
-// 這是「邏輯上」玩家的大小，用於碰撞和定位
-const int PLAYER_LOGIC_WIDTH = 120;
-const int PLAYER_LOGIC_HEIGHT = 205;
+// BlockMan 的尺寸
+const int BLOCKMAN_LOGIC_WIDTH = 120;
+const int BLOCKMAN_LOGIC_HEIGHT = 205;
 
+// Godon 的尺寸
+const int GODON_LOGIC_WIDTH = 160;  // 比 BlockMan 寬 40 像素
+const int GODON_LOGIC_HEIGHT = 245; // 比 BlockMan 高 40 像素
+
+// 為了向後兼容，保留原有的常數名稱
+const int PLAYER_LOGIC_WIDTH = BLOCKMAN_LOGIC_WIDTH;
+const int PLAYER_LOGIC_HEIGHT = BLOCKMAN_LOGIC_HEIGHT;
 
 #endif // CONSTANTS_H
