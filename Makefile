@@ -7,11 +7,11 @@ CXXFLAGS = -I"include" -Wall -Wextra # Added -Wall -Wextra for more warnings, go
 
 #Linker flags (e.g., library paths)
 #We put -L paths here
-LDFLAGS = -L"lib" -L"lib_image" -L"lib_mixer"
+LDFLAGS = -L"lib" -L"lib_image" -L"lib_mixer" -L"lib_ttf"
 
 #Libraries to link
 #We put -l libraries here
-LDLIBS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer
+LDLIBS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_mixer -lSDL2_ttf
 
 #Source files
 #List all your .cpp files here
