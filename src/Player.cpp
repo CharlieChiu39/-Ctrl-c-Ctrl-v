@@ -6,30 +6,49 @@
 #include <cmath>                     // for fabsf
 #include <stdio.h>                   // for printf
 
+// 拳套相關的常數
+const float LIGHT_GLOVE_COOLDOWN = 0.8f;    // 10oz 拳套冷卻時間
+const float MEDIUM_GLOVE_COOLDOWN = 1.0f;   // 14oz 拳套冷卻時間
+const float HEAVY_GLOVE_COOLDOWN = 1.2f;    // 18oz 拳套冷卻時間
+
+const int LIGHT_GLOVE_DAMAGE = 8;          // 10oz 拳套傷害
+const int MEDIUM_GLOVE_DAMAGE = 10;         // 14oz 拳套傷害
+const int HEAVY_GLOVE_DAMAGE = 12;          // 18oz 拳套傷害
 
 Player::Player(float startX, float startY, int startDir,
                const std::string& charId, const std::string& texId) :
     x(startX), y(startY), vx(0.0f), vy(0.0f),
-    health(PLAYER_DEFAULT_HEALTH), // 使用常數
+    health(PLAYER_DEFAULT_HEALTH),
     direction(startDir),
-    state(PlayerState::FALLING), // 初始狀態
-    characterId(charId), textureId(texId), // 儲存 ID
+    state(PlayerState::IDLE),
+    characterId(charId), textureId(texId),
+    currentGlove(GloveType::LIGHT_10OZ),
     attackTimer(0.0f), attackCooldownTimer(0.0f), hurtTimer(0.0f), invincibilityTimer(0.0f), blockCooldownTimer(0.0f),
     attackRateCooldownTimer(0.0f),
     projectileCooldownTimer(0.0f),
-    isOnGround(false),
+    specialAttackCooldownTimer(0.0f),
+    isOnGround(true),
     shouldFireProjectile(false),
     currentFrame(0), frameTimer(0.0f),
-    currentAnimationType(AnimationType::FALL) // 初始動畫類型
+    currentAnimationType(AnimationType::IDLE),
+    isSpecialAttacking(false),
+    hasHitDuringDash(false)
 {
-    printf("Player created: CharacterID='%s', TextureID='%s'\n", characterId.c_str(), textureId.c_str());
+    // 根據角色設定尺寸
+    if (charId == "Godon") {
+        logicWidth = GODON_LOGIC_WIDTH;
+        logicHeight = GODON_LOGIC_HEIGHT;
+    } else { // BlockMan 或其他角色
+        logicWidth = BLOCKMAN_LOGIC_WIDTH;
+        logicHeight = BLOCKMAN_LOGIC_HEIGHT;
+    }
+    printf("Player created: CharacterID='%s', TextureID='%s', Size=%dx%d\n", 
+           characterId.c_str(), textureId.c_str(), logicWidth, logicHeight);
 }
 
 // 封裝狀態改變邏輯
 void Player::changeState(PlayerState newState) {
     if (state == newState) return; // 狀態沒變，不做事
-
-    // printf("Player %s changing state from %d to %d\n", characterId.c_str(), static_cast<int>(state), static_cast<int>(newState));
     PlayerState oldState = state;
     printf("[State] Player %s changing state from %d to %d\n",
     characterId.c_str(), static_cast<int>(oldState), static_cast<int>(newState));
@@ -47,81 +66,107 @@ void Player::changeState(PlayerState newState) {
         case PlayerState::HURT:      currentAnimationType = AnimationType::HURT; break;
         case PlayerState::BLOCKING:  currentAnimationType = AnimationType::BLOCK; break;
         case PlayerState::DEATH:     currentAnimationType = AnimationType::DEATH; break;
-        case PlayerState::VICTORY:   currentAnimationType = AnimationType::VICTORY; break; // <--- 新增處理
-        default:                    currentAnimationType = AnimationType::IDLE; break; // 預設
+        case PlayerState::VICTORY:   currentAnimationType = AnimationType::VICTORY; break;
+        case PlayerState::LYING:     currentAnimationType = AnimationType::LYING; break;
+        default:                    currentAnimationType = AnimationType::IDLE; break;
     }
-
-
-
 }
 
-
 void Player::handleAction(const std::string& action) {
-
-    // 允許在受傷或死亡時執行 STOP_BLOCK (如果玩家在這些狀態下放開按鍵)
+    if (state == PlayerState::LYING && hurtTimer > 0) return;
     if (action == "STOP_BLOCK" && state == PlayerState::BLOCKING) {
         changeState(PlayerState::IDLE);
-        // 在這裡確保冷卻被觸發 (如果 changeState 不觸發了)
-        if (blockCooldownTimer <= 0) { // 避免因其他原因快速切換導致重複觸發
-             blockCooldownTimer = BLOCK_COOLDOWN;
-              printf("Player %s Block Cooldown Started (%.1fs) - From STOP_BLOCK\n", characterId.c_str(), BLOCK_COOLDOWN);
+        if (blockCooldownTimer <= 0) {
+            blockCooldownTimer = BLOCK_COOLDOWN;
         }
         return;
     }
+    if (health <= 0 || state == PlayerState::HURT) return;
 
-    if (state == PlayerState::HURT || health <= 0) return; // 受傷或死亡時不接受控制
+    // --- 處理特殊攻擊 ---
+    if ((action == "SPECIAL_ATTACK" || action == "SPECIAL_ATTACK_NUMPAD") && 
+        canUseSpecialAttack() && 
+        state != PlayerState::ATTACKING && 
+        state != PlayerState::HURT && 
+        state != PlayerState::BLOCKING) {
+        attackTimer = ATTACK_DURATION;
+        specialAttackCooldownTimer = SPECIAL_ATTACK_COOLDOWN;
+        isSpecialAttacking = true;
+        hasHitDuringDash = false;
+        if (characterId == "Godon") {
+            // Godon 衝刺
+            vx = 700.0f * direction; // 衝刺速度
+            attackTimer = 1.0f; // 延長攻擊判定時間，確保有足夠時間撞到敵人
+        } else {
+            vx = 0;
+        }
+        changeState(PlayerState::ATTACKING);
+        return;
+    }
 
-
+    // --- 處理 LYING ---
+    if (action == "LYING" && isOnGround &&
+        state != PlayerState::ATTACKING && state != PlayerState::JUMPING &&
+        state != PlayerState::FALLING && state != PlayerState::BLOCKING && 
+        state != PlayerState::DEATH && state != PlayerState::HURT) {
+        vx = 0;
+        vy = 0;
+        changeState(PlayerState::LYING);
+        return;
+    }
 
     // --- 處理 BLOCK ---
     if (action == "BLOCK" && isOnGround && blockCooldownTimer <= 0 &&
-        state != PlayerState::ATTACKING && state != PlayerState::JUMPING && state != PlayerState::FALLING)
-    {
-        // 可以在 IDLE 或 WALKING 時格擋
-        vx = 0; // 格擋時停止移動
+        state != PlayerState::ATTACKING && state != PlayerState::JUMPING && state != PlayerState::FALLING) {
+        vx = 0;
         changeState(PlayerState::BLOCKING);
     }
-
     // --- 處理氣功發射 ---
     else if (action == "FIRE_PROJECTILE") {
         if (canFireProjectile()) {
-            printf("Player %s handling FIRE_PROJECTILE action.\n", characterId.c_str());
-            changeState(PlayerState::ATTACKING); // <-- 切換到攻擊狀態來播放動畫
-            // 注意：攻擊狀態可能會讓 vx = 0，如果希望發射時能移動，需要調整 ATTACKING 狀態的邏輯
-            vx = 0; // 遵循原本攻擊狀態的邏輯，發射時停下
+            changeState(PlayerState::ATTACKING);
+            vx = 0;
             attackTimer = ATTACK_DURATION;
-            resetProjectileCooldown();          // <-- 重置冷卻
-            shouldFireProjectile = true;        // <-- 設定請求標記
-            AudioManager::playSound("fire"); 
+            resetProjectileCooldown();
+            shouldFireProjectile = true;
+            std::string prefix = (characterId == "BlockMan") ? "blockman_fire" : "godon_fire";
+            AudioManager::playRandomSound(prefix);
         }
     }
-
-    // --- 處理其他動作 (只有在非 Blocking 狀態下才執行) ---
+    // --- 處理其他動作 ---
     else if (state != PlayerState::BLOCKING) {
-         if (action == "LEFT" && state != PlayerState::ATTACKING) {
-            vx = -MOVE_SPEED; direction = -1;
+        if (action == "LEFT" && state != PlayerState::ATTACKING) {
+            vx = -MOVE_SPEED;
+            direction = -1;
             if (isOnGround) changeState(PlayerState::WALKING);
-        } else if (action == "RIGHT" && state != PlayerState::ATTACKING) {
-            vx = MOVE_SPEED; direction = 1;
+        }
+        else if (action == "RIGHT" && state != PlayerState::ATTACKING) {
+            vx = MOVE_SPEED;
+            direction = 1;
             if (isOnGround) changeState(PlayerState::WALKING);
-        } else if (action == "JUMP" && isOnGround && state != PlayerState::ATTACKING) {
-            vy = -JUMP_STRENGTH; isOnGround = false;
+        }
+        else if (action == "JUMP" && isOnGround && state != PlayerState::ATTACKING) {
+            vy = -JUMP_STRENGTH;
+            isOnGround = false;
             changeState(PlayerState::JUMPING);
-            // AudioManager::playSoundEffect("sfx_jump"); // 假設有音效
-        } else if (action == "ATTACK" &&
-            state != PlayerState::ATTACKING &&  // 不能在攻擊中再攻擊
-            state != PlayerState::HURT &&      // 不能在受傷中攻擊
-            state != PlayerState::BLOCKING &&  // 不能在格擋中攻擊 (可選)
-            attackCooldownTimer <= 0 &&      // 確保攻擊動畫恢復完成 (原本的 cooldown)
+            AudioManager::playRandomSound("jump");
+            printf("Jump initiated - vy: %.2f, y: %.2f\n", vy, y); // 調試輸出
+        }
+        else if (action == "ATTACK" &&
+            state != PlayerState::ATTACKING &&
+            state != PlayerState::HURT &&
+            state != PlayerState::BLOCKING &&
+            attackCooldownTimer <= 0 &&
             attackRateCooldownTimer <= 0 &&
             !shouldFireProjectile) {
             attackTimer = ATTACK_DURATION;
-            attackCooldownTimer = ATTACK_DURATION + ATTACK_COOLDOWN;
+            attackCooldownTimer = ATTACK_DURATION + getAttackCooldown();
             attackRateCooldownTimer = ATTACK_RATE_COOLDOWN;
-            vx = 0; // 攻擊時停止水平移動
+            vx = 0;
+            isSpecialAttacking = false;
             changeState(PlayerState::ATTACKING);
-            // AudioManager::playSoundEffect("sfx_attack"); // 假設有音效
-        } else if (action == "STOP_X" && state == PlayerState::WALKING) {
+        }
+        else if (action == "STOP_X" && state == PlayerState::WALKING) {
             vx = 0;
             if (isOnGround) changeState(PlayerState::IDLE);
         }
@@ -129,103 +174,112 @@ void Player::handleAction(const std::string& action) {
 }
 
 void Player::update(float deltaTime) {
-
     // 處理 VICTORY 狀態
     if (state == PlayerState::VICTORY) {
-        updateAnimation(deltaTime); // 勝利時只更新動畫
-        vx = 0; // 停止移動
-        vy = 0; // 確保不會因重力下落 (如果剛好在空中獲勝)
-        // 可以考慮確保他在地面上
+        updateAnimation(deltaTime);
+        vx = 0;
+        vy = 0;
         if (!isOnGround) {
-             y = GROUND_LEVEL - PLAYER_LOGIC_HEIGHT;
-             isOnGround = true;
+            y = GROUND_LEVEL - PLAYER_LOGIC_HEIGHT;
+            isOnGround = true;
         }
-        return; // 直接返回，不執行後續的物理、狀態轉換等
+        return;
     }
 
-
-    //新增死亡狀態的處理
+    // 處理死亡狀態
     if (state == PlayerState::DEATH) {
-        updateAnimation(deltaTime); // 死亡時只更新動畫
-        // 可以在此添加其他死亡時的行為，例如緩慢下沉
-
-        return; // 直接返回，不執行後續邏輯
+        updateAnimation(deltaTime);
+        return;
     }
 
-     // --- 更新計時器 ---
-     if (attackTimer > 0) attackTimer -= deltaTime;
-     if (attackCooldownTimer > 0) attackCooldownTimer -= deltaTime;
-     if (hurtTimer > 0) hurtTimer -= deltaTime;
-     if (invincibilityTimer > 0) invincibilityTimer -= deltaTime;
-     if (blockCooldownTimer > 0) blockCooldownTimer -= deltaTime;
-     if (attackRateCooldownTimer > 0) attackRateCooldownTimer -= deltaTime; 
-     if (projectileCooldownTimer > 0) projectileCooldownTimer -= deltaTime;
+    // --- 更新計時器 ---
+    if (attackTimer > 0) attackTimer -= deltaTime;
+    if (attackCooldownTimer > 0) attackCooldownTimer -= deltaTime;
+    if (hurtTimer > 0) hurtTimer -= deltaTime;
+    if (invincibilityTimer > 0) invincibilityTimer -= deltaTime;
+    if (blockCooldownTimer > 0) blockCooldownTimer -= deltaTime;
+    if (attackRateCooldownTimer > 0) attackRateCooldownTimer -= deltaTime; 
+    if (projectileCooldownTimer > 0) projectileCooldownTimer -= deltaTime;
+    if (specialAttackCooldownTimer > 0) specialAttackCooldownTimer -= deltaTime;
 
-     // --- 狀態自動轉換 (基於計時器) ---
-     // (只有在非格擋狀態下，攻擊/受傷計時器到了才變回 IDLE)
+    // --- 狀態自動轉換 ---
     if (state == PlayerState::ATTACKING && attackTimer <= 0) {
         changeState(PlayerState::IDLE);
+        isSpecialAttacking = false;
     }
     if (state == PlayerState::HURT && hurtTimer <= 0) {
         changeState(PlayerState::IDLE);
     }
-    if (state == PlayerState::DEATH) {
-         updateAnimation(deltaTime); // 死亡時只更新動畫
-         // 可以在此添加其他死亡時的行為，例如緩慢下沉
-         // vy = 0; // 停止垂直移動，如果希望停在原地
-         // vx = 0; // 停止水平移動
-         return; // 直接返回，不執行後續邏輯
-     }
 
-     // --- 物理更新 ---
-     if (state == PlayerState::BLOCKING) { // 格擋時特殊處理
-        vx = 0; // 不能移動
-        if (!isOnGround) { // 如果在空中格擋？(目前設計是在地面才能啟動)
-            vy += GRAVITY * deltaTime; // 仍然受重力
-            y += vy * deltaTime;
-        } else {
-            vy = 0; // 在地面格擋，垂直速度為 0
-        }
-    } else if (state != PlayerState::HURT) { // 非格擋非受傷時正常物理
-        if (!isOnGround) vy += GRAVITY * deltaTime;
-        x += vx * deltaTime;
-        y += vy * deltaTime;
-    } else { // 受傷時的物理
+    // --- 物理更新 ---
+    // 格擋狀態特殊處理
+    if (state == PlayerState::BLOCKING) {
         vx = 0;
-        if (!isOnGround) { vy += GRAVITY * deltaTime; y += vy * deltaTime; }
-    }
-
-     // --- 地面檢測與處理 ---
-     // (基本不變，但落地時的狀態轉換需要考慮 Blocking)
-    if (y + PLAYER_LOGIC_HEIGHT >= GROUND_LEVEL && vy >= 0) {
-        y = GROUND_LEVEL - PLAYER_LOGIC_HEIGHT; vy = 0;
+        vy = 0;
+        y = GROUND_LEVEL - PLAYER_LOGIC_HEIGHT;
+        isOnGround = true;
+    } else {
+        // 先更新垂直位置和速度
         if (!isOnGround) {
-            isOnGround = true;
-             // 只有在非格擋狀態下落地才轉換成 IDLE/WALKING
-             if (state != PlayerState::BLOCKING) {
-                 if (state == PlayerState::JUMPING || state == PlayerState::FALLING ||
-                     (state == PlayerState::HURT && hurtTimer <= 0)) {
-                     changeState((fabsf(vx) < 1.0f) ? PlayerState::IDLE : PlayerState::WALKING);
-                 } else if (state == PlayerState::ATTACKING) {
-                     attackTimer = 0;
-                     changeState((fabsf(vx) < 1.0f) ? PlayerState::IDLE : PlayerState::WALKING);
-                 }
-             }
+            vy += GRAVITY * deltaTime;
+            y += vy * deltaTime;
+            printf("Physics update - y: %.2f, vy: %.2f\n", y, vy); // 調試輸出
         }
-    } else if (y + PLAYER_LOGIC_HEIGHT < GROUND_LEVEL) { // 在空中
-        isOnGround = false;
-        // 只有在 IDLE/WALKING 狀態下離開地面才變成 FALLING
-        if (state == PlayerState::IDLE || state == PlayerState::WALKING) {
-            changeState(PlayerState::FALLING);
+
+        // 更新水平位置
+        x += vx * deltaTime;
+
+        // --- 地面檢測與處理 ---
+        if (y + PLAYER_LOGIC_HEIGHT >= GROUND_LEVEL) {
+            y = GROUND_LEVEL - PLAYER_LOGIC_HEIGHT;
+            vy = 0;
+            if (!isOnGround) {
+                isOnGround = true;
+                printf("Landed on ground\n"); // 調試輸出
+                if (state != PlayerState::BLOCKING) {
+                    if (state == PlayerState::JUMPING || state == PlayerState::FALLING ||
+                        (state == PlayerState::HURT && hurtTimer <= 0)) {
+                        changeState((fabsf(vx) < 1.0f) ? PlayerState::IDLE : PlayerState::WALKING);
+                    } else if (state == PlayerState::ATTACKING) {
+                        attackTimer = 0;
+                        changeState((fabsf(vx) < 1.0f) ? PlayerState::IDLE : PlayerState::WALKING);
+                    }
+                }
+            }
+        } else {
+            isOnGround = false;
+            if (state == PlayerState::IDLE || state == PlayerState::WALKING) {
+                changeState(PlayerState::FALLING);
+            }
         }
     }
 
-     // --- 邊界檢測 ---
-     if (x < 0) x = 0;
-     if (x + PLAYER_LOGIC_WIDTH > SCREEN_WIDTH) x = SCREEN_WIDTH - PLAYER_LOGIC_WIDTH;
+    // --- 邊界檢測 ---
+    if (x < 0) x = 0;
+    if (x + PLAYER_LOGIC_WIDTH > SCREEN_WIDTH) x = SCREEN_WIDTH - PLAYER_LOGIC_WIDTH;
 
-     // --- 更新動畫 ---
-     updateAnimation(deltaTime);
+    // --- 更新動畫 ---
+    updateAnimation(deltaTime);
+
+    // 更新躺下狀態
+    if (state == PlayerState::LYING) {
+        if (hurtTimer <= 0 && !isOnGround) {
+            changeState(PlayerState::IDLE);
+        }
+    }
+
+    // Godon 衝刺技能：攻擊結束時歸零 vx
+    if (characterId == "Godon" && isSpecialAttacking && state == PlayerState::ATTACKING) {
+        // 衝刺期間
+        // 若 attackTimer <= 0 或已經撞到人，結束衝刺
+        if (attackTimer <= 0 || hasHitDuringDash) {
+            vx = 0;
+            isSpecialAttacking = false;
+            if (hasHitDuringDash) {
+                attackTimer = 0; // 如果撞到人了，立即結束攻擊狀態
+            }
+        }
+    }
 }
 
 void Player::updateAnimation(float deltaTime) {
@@ -251,54 +305,69 @@ void Player::updateAnimation(float deltaTime) {
 }
 
 void Player::render(SDL_Renderer* renderer) {
-
-    // 從 TextureManager 取得紋理
     SDL_Texture* texture = TextureManager::getTexture(textureId);
     if (!texture) {
         printf("Error: Texture '%s' not found for player '%s'\n", textureId.c_str(), characterId.c_str());
-        // 可以畫一個預設方塊代替
-        SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255); // 紫紅色表示錯誤
+        SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
         SDL_Rect errorRect = getBoundingBox();
         SDL_RenderFillRect(renderer, &errorRect);
         return;
     }
-
-    // 取得目前動畫幀的來源矩形
     const AnimationInfo* animInfo = AnimationDataManager::getAnimationInfo(characterId, currentAnimationType);
-    if (!animInfo || currentFrame >= animInfo->frameCount) return; // 沒有動畫或幀索引錯誤
+    if (!animInfo || currentFrame >= animInfo->frameCount) return;
     SDL_Rect srcRect = animInfo->frames[currentFrame];
 
-    // 計算目標繪製矩形 (使用邏輯尺寸)
-    SDL_Rect destRect = { (int)x, (int)y, PLAYER_LOGIC_WIDTH, PLAYER_LOGIC_HEIGHT };
-
-    // 決定翻轉
+    SDL_Rect destRect;
+    if (state == PlayerState::LYING) {
+        int lyingW = logicWidth;
+        int lyingH = static_cast<int>(logicHeight * 0.35f);
+        int lyingX = (int)x;
+        int lyingY = GROUND_LEVEL - lyingH;
+        destRect = { lyingX, lyingY, lyingW, lyingH };
+    } else {
+        // 計算基準尺寸（使用 IDLE 動畫的第一幀作為基準）
+        const AnimationInfo* idleInfo = AnimationDataManager::getAnimationInfo(characterId, AnimationType::IDLE);
+        if (!idleInfo || idleInfo->frames.empty()) return;
+        
+        SDL_Rect baseFrame = idleInfo->frames[0];
+        float baseScale = (float)PLAYER_LOGIC_HEIGHT / baseFrame.h;
+        
+        // 計算當前幀的縮放比例
+        float currentScale = baseScale;
+        
+        // 特殊處理攻擊動畫
+        if (state == PlayerState::ATTACKING) {
+            float attackScale = (float)PLAYER_LOGIC_HEIGHT / srcRect.h;
+            currentScale = attackScale;
+        }
+        
+        // 計算渲染尺寸
+        int scaledWidth = (int)(srcRect.w * currentScale);
+        int scaledHeight = (int)(srcRect.h * currentScale);
+        
+        // 計算渲染位置
+        int renderX = (int)x;
+        int renderY = (int)y;
+        
+        if (state == PlayerState::BLOCKING || state == PlayerState::DEATH) {
+            scaledWidth = (int)(srcRect.w * baseScale);
+            scaledHeight = (int)(srcRect.h * baseScale);
+            renderY = GROUND_LEVEL - scaledHeight;
+        }
+        
+        destRect = { renderX, renderY, scaledWidth, scaledHeight };
+    }
+    
+    // 處理角色的渲染
     SDL_RendererFlip flip = (direction == 1) ? SDL_FLIP_NONE : SDL_FLIP_HORIZONTAL;
-
-    // --- 處理無敵閃爍 ---
     bool drawPlayer = true;
     if (invincibilityTimer > 0 && fmod(invincibilityTimer, 0.2f) < 0.1f) {
         drawPlayer = false;
     }
-
-    // --- 繪製角色 ---
     if (drawPlayer) {
         SDL_RenderCopyEx(renderer, texture, &srcRect, &destRect, 0.0, NULL, flip);
     }
-
-    // --- (可選) 繪製攻擊特效 ---
-    if (state == PlayerState::ATTACKING) {
-        SDL_Rect worldHitbox = getHitboxWorld();
-        SDL_Rect attackEffectSrcRect = {996, 1811, 60, 52};
-        SDL_Rect* pSrcRect = NULL;
-        pSrcRect = &attackEffectSrcRect;
-        if (worldHitbox.w > 0 ) {
-           SDL_Rect effectDestRect = worldHitbox;
-           SDL_RenderCopyEx(renderer, texture, pSrcRect, &effectDestRect, 0.0, NULL, flip);
-        }
-        }
-    }
-
-
+}
 
 void Player::takeDamage(int damage) {
     if (invincibilityTimer > 0  || state == PlayerState::DEATH) return;
@@ -317,12 +386,9 @@ void Player::takeDamage(int damage) {
         if (blockCooldownTimer <= 0) { // 避免重複觸發冷卻
             blockCooldownTimer = BLOCK_COOLDOWN; // 使用 Constants.h 的值
             printf("Player %s Block Cooldown Started (%.1fs) - From Successful Block\n", characterId.c_str(), BLOCK_COOLDOWN);
-       }
+        }
 
-       //  重要：格擋成功後，立刻改變狀態 
-       //changeState(PlayerState::IDLE); // <--- 將這一行加回來！
-
-       return; // 阻擋傷害，直接返回
+        return; // 阻擋傷害，直接返回
     }
 
     health -= damage;
@@ -332,45 +398,58 @@ void Player::takeDamage(int damage) {
         health = 0;
         printf("Player %s defeated!\n", characterId.c_str());
         changeState(PlayerState::DEATH);
-        AudioManager::playSound("death");
-        // TODO: 可能需要一個 DEFEATED 狀態
+        std::string prefix = (characterId == "BlockMan") ? "blockman_death" : "godon_death";
+        AudioManager::playRandomSound(prefix);
+        // 確保玩家停止所有動作
+        vx = 0;
+        vy = 0;
+        isOnGround = true;
+        attackTimer = 0;
+        hurtTimer = 0;
+        invincibilityTimer = 0;
+        blockCooldownTimer = 0;
+        attackRateCooldownTimer = 0;
+        projectileCooldownTimer = 0;
     } else {
-        changeState(PlayerState::HURT); // 切換到受傷狀態
+        changeState(PlayerState::HURT);
         hurtTimer = HURT_DURATION;
         invincibilityTimer = HURT_INVINCIBILITY;
         vx = 0;
-        vy = -100.0f; // 受傷彈跳
+        vy = -100.0f;
         isOnGround = false;
-        attackTimer = 0; // 中斷攻擊
-        AudioManager::playSound("hurt");
+        attackTimer = 0;
+        std::string prefix = (characterId == "BlockMan") ? "blockman_hurt" : "godon_hurt";
+        AudioManager::playRandomSound(prefix);
     }
 }
 
 SDL_Rect Player::getBoundingBox() const {
-    return {(int)x, (int)y, PLAYER_LOGIC_WIDTH, PLAYER_LOGIC_HEIGHT};
+    if (state == PlayerState::LYING) {
+        int lyingW = logicWidth;
+        int lyingH = static_cast<int>(logicHeight * 0.35f); // 根據角色高度調整躺下時的高度
+        int lyingX = (int)x;
+        int lyingY = GROUND_LEVEL - lyingH;
+        return { lyingX, lyingY, lyingW, lyingH };
+    }
+    return { (int)x, (int)y, logicWidth, logicHeight };
 }
 
 // 計算相對於自身的攻擊框 (Hitbox)
 SDL_Rect Player::calculateRelativeHitbox() const {
-    // TODO: 這個應該根據角色和攻擊類型來決定，可以從 AnimationData 或角色配置讀取
-    // 暫時使用 main (2).cpp 的硬編碼值
-    int hitboxWidth = 40;
-    int hitboxHeight = 20;
-    int offsetX = (direction == 1) ? PLAYER_LOGIC_WIDTH : -hitboxWidth; // X 偏移量
-    int offsetY = PLAYER_LOGIC_HEIGHT / 4; // Y 偏移量
+    // 根據角色尺寸調整攻擊判定框
+    int hitboxWidth = static_cast<int>(logicWidth * 0.5f);  // 攻擊判定寬度為角色寬度的一半
+    int hitboxHeight = static_cast<int>(logicHeight * 0.25f);  // 攻擊判定高度為角色高度的四分之一
+    int offsetX = (direction == 1) ? logicWidth - 20 : -hitboxWidth + 20;
+    int offsetY = logicHeight / 2 - hitboxHeight / 2;
     return {offsetX, offsetY, hitboxWidth, hitboxHeight};
 }
 
 
 SDL_Rect Player::getHitboxWorld() const {
     if (state == PlayerState::ATTACKING && attackTimer > 0) {
-        float attackEndTime = ATTACK_DURATION; // 假設從 Constants.h 讀取
-        // 檢查是否在 hitbox 生效時間內
-        if (attackTimer > (attackEndTime - ATTACK_HITBOX_ACTIVE_END) &&
-            attackTimer <= (attackEndTime - ATTACK_HITBOX_ACTIVE_START))
-        {
+        // 在攻擊動畫的前半段產生判定
+        if (attackTimer > ATTACK_DURATION * 0.5f) {
             SDL_Rect relativeHitbox = calculateRelativeHitbox();
-            // 計算世界座標
             return {(int)x + relativeHitbox.x, (int)y + relativeHitbox.y, relativeHitbox.w, relativeHitbox.h};
         }
     }
@@ -411,4 +490,57 @@ bool Player::isControllable() const {
         default:
             return false; // 這些狀態下不可控制
     }
+}
+
+void Player::setGlove(GloveType gloveType) {
+    currentGlove = gloveType;
+    printf("Player %s switched to %s gloves\n", characterId.c_str(), getGloveName().c_str());
+}
+
+float Player::getAttackCooldown() const {
+    switch (currentGlove) {
+        case GloveType::LIGHT_10OZ:
+            return LIGHT_GLOVE_COOLDOWN;
+        case GloveType::MEDIUM_14OZ:
+            return MEDIUM_GLOVE_COOLDOWN;
+        case GloveType::HEAVY_18OZ:
+            return HEAVY_GLOVE_COOLDOWN;
+        default:
+            return LIGHT_GLOVE_COOLDOWN;
+    }
+}
+
+int Player::getAttackDamage() const {
+    switch (currentGlove) {
+        case GloveType::LIGHT_10OZ:
+            return LIGHT_GLOVE_DAMAGE;
+        case GloveType::MEDIUM_14OZ:
+            return MEDIUM_GLOVE_DAMAGE;
+        case GloveType::HEAVY_18OZ:
+            return HEAVY_GLOVE_DAMAGE;
+        default:
+            return LIGHT_GLOVE_DAMAGE;
+    }
+}
+
+std::string Player::getGloveName() const {
+    switch (currentGlove) {
+        case GloveType::LIGHT_10OZ:
+            return "10oz";
+        case GloveType::MEDIUM_14OZ:
+            return "14oz";
+        case GloveType::HEAVY_18OZ:
+            return "18oz";
+        default:
+            return "Unknown";
+    }
+}
+
+bool Player::canUseSpecialAttack() const {
+    return specialAttackCooldownTimer <= 0;
+}
+
+void Player::resetSpecialAttackCooldown() {
+    specialAttackCooldownTimer = SPECIAL_ATTACK_COOLDOWN;
+    hasHitDuringDash = false;
 }
