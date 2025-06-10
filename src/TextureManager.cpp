@@ -1,5 +1,5 @@
-#include <stdio.h> // for printf
 #include "TextureManager.h"
+#include <stdio.h> // for printf
 
 // 初始化靜態成員變數
 std::map<std::string, SDL_Texture*> TextureManager::textureMap;

@@ -93,6 +93,10 @@ void AnimationDataManager::initializeBlockManAnimations() {
     std::vector<SDL_Rect> deathFrames = {{150, 2260, DEATH_W, DEATH_H}}; // <--- 請換成實際格擋幀的座標和尺寸
     defineAnimation(charId, AnimationType::DEATH, deathFrames, 0.1f, false); // 死亡通常不循環播放
 
+    // LYING 動畫 (1 幀)
+    std::vector<SDL_Rect> lyingFrames = {{1170, 2210, 102, 45}};
+    defineAnimation(charId, AnimationType::LYING, lyingFrames, 0.1f, false);
+
      // --- 新增 VICTORY 動畫 ---
     // vvvvv 請務必換成你實際的勝利動畫幀數據 vvvvv
     const int VICTORY_W = 80; // 假設寬度
@@ -108,6 +112,64 @@ void AnimationDataManager::initializeBlockManAnimations() {
     // 定義勝利動畫，假設每幀 0.12 秒，不循環
     defineAnimation(charId, AnimationType::VICTORY, victoryFrames, 0.12f, false);
 
+
+    printf("Initialized animations for character: %s\n", charId.c_str());
+}
+
+// 初始化 Godon 的動畫數據
+void AnimationDataManager::initializeGodonAnimations() {
+    const std::string charId = "Godon"; // 定義此角色的 ID
+
+    // IDLE animation (4 frames)
+    std::vector<SDL_Rect> idleFrames = {
+        {10, 14, 112, 115},    // Frame 1
+        {122, 14, 112, 115},   // Frame 2
+        {234, 14, 126, 115},   // Frame 3
+        {360, 14, 115, 115}    // Frame 4
+    };
+    defineAnimation(charId, AnimationType::IDLE, idleFrames, 0.1f, true);
+
+    // Walk 動畫 (2 幀)
+    std::vector<SDL_Rect> walkFrames;
+    for (int i = 0; i < 2; ++i) {
+        walkFrames.push_back({118 + i * 110, 150, 110, 115});
+    }
+    defineAnimation(charId, AnimationType::WALK, walkFrames, 0.1f, true);
+
+    // Attack 動畫 (3 幀)
+    std::vector<SDL_Rect> attackFrames = {
+        {820, 548, 115, 130},    // Frame 1
+        {935, 548, 115, 130},    // Frame 2
+        {1050, 548, 115, 130}    // Frame 3
+    };
+    defineAnimation(charId, AnimationType::ATTACK, attackFrames, 0.15f, false); // 調整為 0.1f 使每幀播放更流暢
+
+    // Hurt 動畫 (3 幀)
+    std::vector<SDL_Rect> hurtFrames;
+    for (int i = 0; i < 3; ++i) {
+        hurtFrames.push_back({555 + i * 99, 5065, 99, 110});
+    }
+    defineAnimation(charId, AnimationType::HURT, hurtFrames, 0.13f, false);
+
+    // Jump 動畫 (1 幀)
+    std::vector<SDL_Rect> jumpFrames = {{408, 3090, 105, 105}};
+    defineAnimation(charId, AnimationType::JUMP, jumpFrames, 0.1f, false);
+
+    // Fall 動畫 (1 幀)
+    std::vector<SDL_Rect> fallFrames = {{408, 3090, 105, 105}};
+    defineAnimation(charId, AnimationType::FALL, fallFrames, 0.1f, false);
+
+    // Block 動畫 (1 幀)
+    std::vector<SDL_Rect> blockFrames = {{488, 4950, 105, 88}};
+    defineAnimation(charId, AnimationType::BLOCK, blockFrames, 0.1f, false);
+
+    // DEATH 動畫 (1 幀)
+    std::vector<SDL_Rect> deathFrames = {{440, 5530, 160, 70}};
+    defineAnimation(charId, AnimationType::DEATH, deathFrames, 0.1f, false);
+
+    // LYING 動畫 (1 幀)
+    std::vector<SDL_Rect> lyingFrames = {{137, 5534, 128, 63}};
+    defineAnimation(charId, AnimationType::LYING, lyingFrames, 0.1f, false);
 
     printf("Initialized animations for character: %s\n", charId.c_str());
 }

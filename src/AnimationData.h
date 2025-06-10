@@ -8,7 +8,7 @@
 
 // --- 角色動畫類型 ---
 enum class AnimationType {
-    IDLE, WALK, JUMP, FALL, ATTACK, HURT, BLOCK, DEATH, VICTORY
+    IDLE, WALK, JUMP, FALL, ATTACK, HURT, BLOCK, DEATH, VICTORY, LYING
     // 可以根據需要增加更多類型
 };
 
@@ -43,6 +43,9 @@ public:
     // 初始化內建角色 ("BlockMan") 的動畫數據
     // 這是將原本 initializeAnimationRects 的邏輯封裝起來
     static void initializeBlockManAnimations();
+
+    // 初始化 Godon 的動畫數據
+    static void initializeGodonAnimations();
 
 private:
     // 使用巢狀 Map 來儲存: characterId -> AnimationType -> AnimationInfo
